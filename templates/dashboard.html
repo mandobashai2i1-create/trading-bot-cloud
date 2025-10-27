@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>البوت التجاري - لوحة التحكم</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        
+        /* الهيدر */
+        .header { 
+            text-align: center; 
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        
+        /* الكروت */
+        .card { 
+            background: rgba(255,255,255,0.1); 
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255,255,255,0.2);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: rgba(255,255,255,0.15);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .profit { color: #4CAF50; font-weight: bold; }
+        .loss { color: #f44336; font-weight: bold; }
+        
+        /* الأزرار */
+        .btn { 
+            background: #4CAF50; 
+            color: white; 
+            border: none; 
+            padding: 12px 25px;
+            border-radius: 8px; 
+            margin: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
+        .btn-stop { background: #f44336; }
+        .btn-reset { background: #ff9800; }
+        
+        /* الجداول */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: right;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        th {
+            background: rgba(255,255,255,0.2);
+        }
+        
+        .status-running { color: #4CAF50; }
+        .status-stopped { color: #f44336; }
+        
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- الهيدر -->
+        <div class="header">
+            <h1>🤖 البوت التجاري الآلي - لوحة التحكم</h1>
+            <p>نظام تداول آلي متكامل - بيانات حية من بينانس</p>
+        </div>
+
+        <!-- إحصائيات سريعة -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>💰 الرصيد</h3>
+                <p id="balance">1,000.00$</p>
+            </div>
+            <div class="stat-card">
+                <h3>📈 الأرباح</h3>
+                <p id="profit" class="profit">+0.00$</p>
+            </div>
+            <div class="stat-card">
+                <h3>🔄 الصفقات النشطة</h3>
+                <p id="activeTrades">0</p>
+            </div>
+            <div class="stat-card">
+                <h3>⚡ الحالة</h3>
+                <p id="status" class="status-stopped">متوقف</p>
+            </div>
+        </div>
+
+        <!-- أزرار التحكم -->
+        <div class="card">
+            <h3>🎮 تحكم فوري</h3>
+            <div class="controls">
+                <button class="btn" onclick="controlBot('start')">▶️ بدء التشغيل</button>
+                <button class="btn btn-stop" onclick="controlBot('stop')">⏹️ إيقاف</button>
+                <button class="btn btn-reset" onclick="controlBot('reset')">🔄 إعادة تعيين</button>
+            </div>
+        </div>
+
+        <!-- الأسعار الحية -->
+        <div class="card">
+            <h3>📊 الأسعار الحية من بينانس</h3>
+            <div id="livePrices">جاري تحميل الأسعار...</div>
+        </div>
+
+        <!-- آخر الصفقات -->
+        <div class="card">
+            <h3>📋 آخر الصفقات</h3>
+            <div id="tradesTable">جاري تحميل الصفقات...</div>
+        </div>
+
+        <!-- معلومات النظام -->
+        <div class="card">
+            <h3>ℹ️ معلومات النظام</h3>
+            <p>آخر تحديث: <span id="lastUpdate">--</span></p>
+            <p>وقت الخادم: <span id="serverTime">--</span></p>
+        </div>
+    </div>
+
+    <script>
+        // تحديث البيانات كل 3 ثواني
+        async function updateData() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                
+                // تحديث الإحصائيات
+                document.getElementById('balance').textContent = data.balance.toFixed(2) + '$';
+                document.getElementById('profit').textContent = 
+                    (data.profit_loss > 0 ? '+' : '') + data.profit_loss.toFixed(2) + '$';
+                document.getElementById('activeTrades').textContent = data.active_trades;
+                
+                // تحديث الحالة
+                const statusElement = document.getElementById('status');
+                statusElement.textContent = data.status === 'running' ? 'يعمل 🟢' : 'متوقف 🔴';
+                statusElement.className = data.status === 'running' ? 'status-running' : 'status-stopped';
+                
+                // تحديث الأسعار الحية
+                if (data.live_prices && data.live_prices.length > 0) {
+                    let pricesHTML = '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;">';
+                    data.live_prices.forEach(price => {
+                        pricesHTML += `
+                            <div style="background: rgba(255,255,255,0.1); padding: 10px; border-radius: 8px; text-align: center;">
+                                <strong>${price.symbol}</strong><br>
+                                ${parseFloat(price.price).toFixed(2)}$
+                            </div>
+                        `;
+                    });
+                    pricesHTML += '</div>';
+                    document.getElementById('livePrices').innerHTML = pricesHTML;
+                }
+                
+                // تحديث الوقت
+                document.getElementById('lastUpdate').textContent = data.last_update;
+                document.getElementById('serverTime').textContent = data.server_time;
+                
+            } catch (error) {
+                console.error('Error updating data:', error);
+            }
+        }
+
+        // تحميل الصفقات
+        async function loadTrades() {
+            try {
+                const response = await fetch('/api/trades');
+                const trades = await response.json();
+                
+                let tradesHTML = '<table>';
+                tradesHTML += `
+                    <tr>
+                        <th>الزوج</th>
+                        <th>النوع</th>
+                        <th>الكمية</th>
+                        <th>السعر</th>
+                        <th>الربح</th>
+                        <th>الوقت</th>
+                    </tr>
+                `;
+                
+                trades.forEach(trade => {
+                    tradesHTML += `
+                        <tr>
+                            <td>${trade.symbol}</td>
+                            <td style="color: ${trade.type === 'buy' ? '#4CAF50' : '#f44336'}">
+                                ${trade.type === 'buy' ? 'شراء' : 'بيع'}
+                            </td>
+                            <td>${trade.amount}</td>
+                            <td>${trade.price}$</td>
+                            <td style="color: ${trade.profit > 0 ? '#4CAF50' : '#f44336'}">
+                                ${trade.profit > 0 ? '+' : ''}${trade.profit}$
+                            </td>
+                            <td>${trade.time}</td>
+                        </tr>
+                    `;
+                });
+                
+                tradesHTML += '</table>';
+                document.getElementById('tradesTable').innerHTML = tradesHTML;
+                
+            } catch (error) {
+                console.error('Error loading trades:', error);
+            }
+        }
+
+        // التحكم في البوت
+        async function controlBot(action) {
+            try {
+                const response = await fetch('/api/control', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: action })
+                });
+                const result = await response.json();
+                alert(result.message);
+                updateData(); // تحديث البيانات فوراً
+            } catch (error) {
+                console.error('Error controlling bot:', error);
+                alert('❌ حدث خطأ في التحكم');
+            }
+        }
+
+        // التهيئة
+        document.addEventListener('DOMContentLoaded', function() {
+            updateData();
+            loadTrades();
+            setInterval(updateData, 3000); // تحديث كل 3 ثواني
+            setInterval(loadTrades, 10000); // تحديث الصفقات كل 10 ثواني
+        });
+    </script>
+</body>
+</html>
